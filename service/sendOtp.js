@@ -1,6 +1,6 @@
-import nodemailer from "nodemailer";
 import Otp from "../Model/otpModel.js";
-import crypto from 'crypto'
+import crypto from "crypto";
+import axios from 'axios'
 
 export async function sendOtp(email) {
   try {
@@ -12,33 +12,50 @@ export async function sendOtp(email) {
       { upsert: true }
     ).lean();
 
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
-      connectionTimeout: 20000,
-      auth: {
-        user: process.env.OTP_SENDER_EMAIL,
-        pass: process.env.GMAIL_KEY_PASS,
-      },
-    });
-
     const htmlMsg = `<div>
                             <h2>Your Otp is :</h2> <br>
                             <h1><b>${otp}</b></h1>
                     </div>`;
 
-    const info = await transporter.sendMail({
-      from: '"Storage App OTP" <md.mushahidansari@gmail.com>',
-      to: email,
-      subject: "Storage APP OTP Verification",
-      html: htmlMsg,
-    });
-    console.log({transporter,info})
-    return { success: true };
+    const response = await sendEmail(email, "Storage App OTP", htmlMsg);
+
+    return response;
   } catch (error) {
     console.log(error);
-    return {success:false};
+    return { success: false };
+  }
+}
+
+export async function sendEmail(to, subject, html) {
+  try {
+    const res = await axios.post(
+      "https://api.brevo.com/v3/smtp/email",
+      {
+        sender: {
+          name: "Storage App",
+          email: process.env.SENDER_EMAIL,
+        },
+        to: [
+          {
+            email: to,
+          },
+        ],
+        subject,
+        htmlContent: html,
+      },
+      {
+        headers: {
+          "api-key":process.env.BREVO_KEY_ID,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    // console.log(res)
+    return { success: true, data: res.data };
+  } catch (error) {
+    console.log(error);
+    console.error("Brevo email error:", error.response?.data || error.message);
+    return { success: false, error: error.response?.data };
   }
 }
 

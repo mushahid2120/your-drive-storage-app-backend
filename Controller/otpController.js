@@ -5,6 +5,7 @@ export const sendOtpApi=async(req,res,next)=>{
         const {email}=req.body;
         console.log(email)
         const result=await sendOtp(email)
+        console.log(result)
         if(!result.success) return res.status(400).json({error: {otp: "Invalid or Expired OTP"}})
         return res.json({message: "OTP Send Successfully"})
     } catch (error) {
