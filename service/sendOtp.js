@@ -16,7 +16,7 @@ export async function sendOtp(email) {
       host: "smtp.gmail.com",
       port: 465,
       secure: true,
-      connectionTimeout: 10000,
+      connectionTimeout: 20000,
       auth: {
         user: process.env.OTP_SENDER_EMAIL,
         pass: process.env.GMAIL_KEY_PASS,
