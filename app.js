@@ -31,7 +31,7 @@ const port = process.env.PORT || 4000;
 const app = express();
 app.use(helmet());
 
-app.use(rateLimiter,throtle);
+// app.use(rateLimiter,throtle);
 app.use(express.json());
 app.use(cookieParser(mySecret));
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
