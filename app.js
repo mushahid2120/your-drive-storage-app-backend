@@ -46,11 +46,11 @@ app.use("/files", checkAuth, fileRoutes);
 app.use("/auth", authRoutes);
 app.use("/otp", otpRouter);
 
-// app.use((err, req, res, next) => {
-//   console.log("Global error handler");
-//   return res.status(500).json({err})
-//   // return res.status(req.status || 500).json({ error: "something-went-wrong" });
-// });
+app.use((err, req, res, next) => {
+  console.log("Global error handler");
+  // return res.status(500).json({err})
+  return res.status(req.status || 500).json({ error: "something-went-wrong" });
+});
 
 app.listen(port, () => {
   console.log("Server is Running on port number 4000");

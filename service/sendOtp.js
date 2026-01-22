@@ -14,9 +14,12 @@ export async function sendOtp(email) {
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      connectionTimeout: 10000,
       auth: {
-        user: "md.mushahidansari@gmail.com",
-        pass: "rbyx mqyr eafa wxev",
+        user: process.env.OTP_SENDER_EMAIL,
+        pass: process.env.GMAIL_KEY_PASS,
       },
     });
 
@@ -34,7 +37,7 @@ export async function sendOtp(email) {
     return { success: true };
   } catch (error) {
     console.log(error);
-    return "Otp not Sent";
+    return {success:false};
   }
 }
 
