@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node --env-file=.env --watch app.js",
-    "dbsetup": "node --env-file=.env ./config/dbSetup.js"
+    "dbsetup": "node --env-file=.env ./config/dbSetup.js",
+    "start": "node app.js"
   },
   "keywords": [],
   "author": "",
