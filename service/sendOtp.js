@@ -34,6 +34,7 @@ export async function sendOtp(email) {
       subject: "Storage APP OTP Verification",
       html: htmlMsg,
     });
+    console.log({transporter,info})
     return { success: true };
   } catch (error) {
     console.log(error);
