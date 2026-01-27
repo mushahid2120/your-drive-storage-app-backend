@@ -12,29 +12,40 @@ import z from "zod";
 
 export const mySecret = process.env.SESSION_SECRET;
 export const cookieCofig = {
-      sameSite: process.env.COOKIE_SAMESITE,
-      signed: true,
-      secure: true,
-      path: "/",
-      httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    };
+  sameSite: process.env.COOKIE_SAMESITE,
+  signed: true,
+  secure: true,
+  path: "/",
+  httpOnly: true,
+  maxAge: 1000 * 60 * 60 * 24 * 7,
+};
 
-export const clearCookieConfig={
-    sameSite: process.env.COOKIE_SAMESITE,
-    secure: true,
-  }
+export const clearCookieConfig = {
+  sameSite: process.env.COOKIE_SAMESITE,
+  secure: true,
+};
 
 export const signup = async (req, res, next) => {
-  // const { name, email, password, otp } = req.body;
-
   const { success, data, error } = signUpSchema.safeParse(req.body);
-  if (!success) return res.status(400).json({ error: z.flattenError(error) });
+  if (!success) {
+    console.log(z.flattenError(error));
+    return res.status(400).json({
+      error: Object.keys(z.flattenError(error).fieldErrors).reduce(
+        (acc, key) => {
+          acc[key] = z.flattenError(error).fieldErrors[key];
+          return acc;
+        },
+        {}
+      ),
+    });
+  }
   const { name, email, password, otp } = data;
 
   const isValidotp = await verifyOtp(otp, email);
-  if (!isValidotp)
+  if (!isValidotp) {
+    console.log("Invalid or Expired OTP");
     return res.status(400).json({ error: { otp: "Invalid or Expired OTP" } });
+  }
 
   const userId = new mongoose.Types.ObjectId();
   const dirId = new mongoose.Types.ObjectId();
@@ -64,24 +75,29 @@ export const signup = async (req, res, next) => {
 
     session.commitTransaction();
 
+    console.log(`USER CREATED USERNAME: ${name}`);
     res.json({ message: "User Created" });
   } catch (error) {
-    console.log(error);
     await session.abortTransaction();
     if (error.name === "ValidationError") {
       const [errorFor] = Object.keys(error.errors);
       const errorMessage = error.errors[errorFor].properties.message;
+      console.log({ [errorFor]: errorMessage });
       return res.status(401).json({ error: { [errorFor]: errorMessage } });
     } else {
       if (error.name === "MongoServerError")
-        if (error.code === 11000)
+        if (error.code === 11000) {
+          console.log({ error: "Email already Exist " });
           return res
             .status(401)
             .json({ error: { email: "email already Exist " } });
+        }
       if (error.code === 121) {
+        console.log({ error: "Schema Validation Error" });
         return res.status(400).json({ error: "Schema Validation Error" });
       }
     }
+    console.log(error);
     next(error);
   }
 };
@@ -90,19 +106,29 @@ export const login = async (req, res, next) => {
   try {
     // const { email, password } = req.body;
     const { success, data, error } = loginSchema.safeParse(req.body);
-    if (!success) return res.status(400).json({ error: z.flattenError(error) });
+    if (!success) {
+      console.log(z.flattenError(error));
+      return res.status(400).json({ error: z.flattenError(error) });
+    }
     const { email, password } = data;
 
     const user = await Users.findOne({ email });
-    if (!user) return res.status(401).json({ error: "Invalid Credentials" });
-    if (user.deleted)
+    if (!user) {
+      console.log(`${email} not exist`);
+      return res.status(401).json({ error: "Invalid Credentials" });
+    }
+    if (user.deleted) {
+      console.log(`${email} account is temporary deleted`);
       return res.status(402).json({
         error: "You accout has been delted please contact for recovery",
       });
+    }
     const isPasswordValid = await user.comparePassword(password);
 
-    if (!isPasswordValid)
+    if (!isPasswordValid) {
+      console.log(`${email} password doesn't matched`);
       return res.status(401).json({ error: "Invalid Credentials" });
+    }
 
     const allSession = await Session.find({ userId: user.id });
     if (allSession.length > 3) await allSession[0].deleteOne();
@@ -123,9 +149,8 @@ export const login = async (req, res, next) => {
     //   userId: user._id,
     // });
 
-    
-
     res.cookie("sid", session.id, cookieCofig);
+    console.log(`${email} PASSWORD DOESN'T MATCHED`);
     return res.json({ message: "Login Successful" });
   } catch (error) {
     console.log(error);
@@ -133,19 +158,31 @@ export const login = async (req, res, next) => {
   }
 };
 
-export const logout = async (req, res) => {
-  const { sid } = req.signedCookies;
-  await Session.findByIdAndDelete(sid);
-  res.clearCookie("sid", clearCookieConfig);
-  res.json({ message: "Logout Successfull" });
+export const logout = async (req, res, next) => {
+  try {
+    const { sid } = req.signedCookies;
+    const deletedSession = await Session.findByIdAndDelete(sid);
+    res.clearCookie("sid", clearCookieConfig);
+    console.log(`${deletedSession.userId} LOGOUT`);
+    res.json({ message: "Logout Successfull" });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
 };
 
-export const logoutAll = async (req, res) => {
-  const { sid } = req.signedCookies;
-  const session = await Session.findById(sid);
-  await Session.deleteMany({ userId: session.userId });
-  res.clearCookie("sid", clearCookieConfig);
-  res.json({ message: "Logout All Successfull" });
+export const logoutAll = async (req, res, error) => {
+  try {
+    const { sid } = req.signedCookies;
+    const session = await Session.findById(sid);
+    await Session.deleteMany({ userId: session.userId });
+    res.clearCookie("sid", clearCookieConfig);
+    console.log(`${session.userId} LOGOUT FROM ALL DEVICES`);
+    res.json({ message: "Logout All Successfull" });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
 };
 
 export const getUser = (req, res) => {
@@ -166,22 +203,26 @@ export const loginWithGoogle = async (req, res, next) => {
     idToken,
     audience: process.env.GOOGLE_CLIENT_ID,
   });
-  if (!googleUser)
+  if (!googleUser) {
+    console.log("Google user verification failed");
     return res.staus(403).json({ error: "User verifaction failed" });
-  const { email, picture, name, sub } = googleUser.getPayload();
+  }
+  const { email, picture, name } = googleUser.getPayload();
   const dbUser = await Users.findOne({ email }).lean();
   if (dbUser) {
-    if (dbUser.deleted)
+    if (dbUser.deleted) {
+      console.log(`${dbUser.name} account deleted softly`);
       return res.status(402).json({
         error: "You accout has been deleted please contact for recovery",
       });
+    }
     const allSession = await Session.find({ userId: dbUser._id });
     if (allSession.length > 3) await allSession[0].deleteOne();
 
     const session = await Session.create({ userId: dbUser._id });
 
-
     res.cookie("sid", session.id, cookieCofig);
+    console.log(`${dbUser.name} LOGIN USING GOOGLE`);
     return res.json({ error: "Login but user already Exist" });
   }
   const userId = new mongoose.Types.ObjectId();
@@ -216,6 +257,7 @@ export const loginWithGoogle = async (req, res, next) => {
 
     dbSession.commitTransaction();
 
+    console.log(`${name} USER IS CREATED USING GOOGLE`);
     return res.json({ message: "User Created" });
   } catch (error) {
     dbSession.abortTransaction();
@@ -238,6 +280,8 @@ export const getAllUsers = async (req, res, next) => {
       email,
       isLoggedIn: allSessionUserIdSet.has(_id.toString()),
     }));
+
+    console.log("GET ALL USER FOR ADMIN PAGE");
     return res.json(transformedUser);
   } catch (error) {
     console.log(error);
@@ -249,10 +293,11 @@ export const logoutUserById = async (req, res, next) => {
   try {
     const userId = req.params?.userId;
     await Session.deleteMany({ userId });
+    console.log(`${userId} is logout`);
     res.status(202).end();
   } catch (error) {
     console.log(error);
-    next(error)
+    next(error);
   }
 };
 
@@ -272,11 +317,12 @@ export const hardDeleteUser = async (req, res, next) => {
     await Session.deleteMany({ userId });
     await Users.findByIdAndDelete(userId);
     session.commitTransaction();
+    console.log(`${userId} IS HARD DELETED`);
     res.status(204).end();
   } catch (error) {
     session.abortTransaction();
     console.log(error);
-    next(error)
+    next(error);
   }
 };
 
@@ -285,9 +331,10 @@ export const softDeleteUser = async (req, res, next) => {
     const userId = req.params?.userId;
     await Session.deleteMany({ userId });
     await Users.findByIdAndUpdate(userId, { deleted: true });
+    console.log(`${userId} is soft Deleted`);
     res.status(204).end();
   } catch (error) {
     console.log(error);
-    next(error)
+    next(error);
   }
 };
