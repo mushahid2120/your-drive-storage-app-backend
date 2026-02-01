@@ -5,11 +5,11 @@ import Dir from "../Model/dirModel.js";
 import { purify, updateDirSize } from "./dirController.js";
 import mongoose from "mongoose";
 import {
-  createGetSignUrl,
   createPutSignUrl,
   deleteMultipleObjects,
   verifyS3Object,
 } from "../config/aws_s3.js";
+import cloudfrontSignedUrl from "../config/aws_cf.js";
 
 //Get file
 export const getFile = async (req, res, next) => {
@@ -22,7 +22,7 @@ export const getFile = async (req, res, next) => {
     }).lean();
     if (!parentDirData) {
       console.log(
-        `${req.user.name} is not authorized to access this file: ${id}`
+        `${req.user.name} is not authorized to access this file: ${id}`,
       );
       return res.status(401).json({ error: "You don't hav access" });
     }
@@ -32,13 +32,19 @@ export const getFile = async (req, res, next) => {
     }
     const fileFullName = `${id}${fileData.extension}`;
     if (req.query.action === "download") {
-      const getUrl = await createGetSignUrl(fileFullName, true, fileData.name);
+      // const getUrl = await createGetSignUrl(fileFullName, true, fileData.name);
+      const cfSignedUrl = cloudfrontSignedUrl(
+        fileFullName,
+        fileData.name,
+        true,
+      );
       console.log(`${fileData.name} is Downloading by ${req.user.name}`);
-      return res.redirect(getUrl);
+      return res.redirect(cfSignedUrl);
     }
-    const getUrl = await createGetSignUrl(fileFullName, false, fileData.name);
+    // const getUrl = await createGetSignUrl(fileFullName, false, fileData.name);
+    const cfSignedUrl = cloudfrontSignedUrl(fileFullName, fileData.name);
     console.log(`${req.user.name} req for getUrl of file ${fileData.name}`);
-    return res.redirect(getUrl);
+    return res.redirect(cfSignedUrl);
   } catch (error) {
     console.log(error);
     next(error);
@@ -84,7 +90,7 @@ export const uploadFileInit = async (req, res, next) => {
 
     if (!parentDirData.userId.equals(req.user._id)) {
       console.log(
-        `${req.user.name} is not authorized to uplaod file initiated`
+        `${req.user.name} is not authorized to uplaod file initiated`,
       );
       return res
         .status(403)
@@ -122,7 +128,7 @@ export const uploadFileComplete = async (req, res, next) => {
   const fileId = req.params?.fileId;
 
   const fileData = await Files.findById(fileId).select(
-    " extension userId _id parentDirId"
+    " extension userId _id parentDirId",
   );
   const parentDirData = await Dir.findById(fileData.parentDirId)
     .select("path -_id")
@@ -214,15 +220,16 @@ export const deleteFile = async (req, res, next) => {
 
     const fileFullName = `${id}${fileData.extension}`;
     const { Errors } = await deleteMultipleObjects([fileFullName]);
-    if (Errors){
-      console.log(`${id} unable to delte file`)
-      return res.status(400).json({ error: "File Could not delete" });}
+    if (Errors) {
+      console.log(`${id} unable to delte file`);
+      return res.status(400).json({ error: "File Could not delete" });
+    }
     await Files.findByIdAndDelete(id);
     await updateDirSize(parentDirData.path, -fileData.size);
-    console.log(`${id} FILE DELTED SUCCESSFULLY`)
+    console.log(`${id} FILE DELTED SUCCESSFULLY`);
     return res.json({ message: "File Deleted" });
   } catch (error) {
-    console.log(error)
+    console.log(error);
     next(error);
   }
 };

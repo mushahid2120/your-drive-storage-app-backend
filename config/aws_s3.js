@@ -39,31 +39,31 @@ export const createPutSignUrl = async (fileFullName, filetype) => {
   }
 };
 
-export const createGetSignUrl = async (
-  fileFullName,
-  download,
-  originalName
-) => {
-  try {
-    const contentDisposition = `${
-      download ? "attachment" : "inline"
-    };filename=${encodeURIComponent(originalName)}`;
+// export const createGetSignUrl = async (
+//   fileFullName,
+//   download,
+//   originalName
+// ) => {
+//   try {
+//     const contentDisposition = `${
+//       download ? "attachment" : "inline"
+//     };filename=${encodeURIComponent(originalName)}`;
 
-    const getObjCommand = new GetObjectCommand({
-      Bucket,
-      Key: fileFullName,
-      ResponseContentDisposition: contentDisposition,
-    });
+//     const getObjCommand = new GetObjectCommand({
+//       Bucket,
+//       Key: fileFullName,
+//       ResponseContentDisposition: contentDisposition,
+//     });
 
-    const url = await getSignedUrl(s3Client, getObjCommand, {
-      expiresIn: 60 * 5,
-    });
-    return url;
-  } catch (error) {
-    console.log(error);
-    return false;
-  }
-};
+//     const url = await getSignedUrl(s3Client, getObjCommand, {
+//       expiresIn: 60 * 5,
+//     });
+//     return url;
+//   } catch (error) {
+//     console.log(error);
+//     return false;
+//   }
+// };
 
 export const verifyS3Object = async (fileFullName) => {
   try {
