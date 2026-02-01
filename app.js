@@ -10,7 +10,7 @@ import { mySecret } from "./Controller/userController.js";
 import otpRouter from "./routes/otpRoutes.js";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
-import { slowDown } from 'express-slow-down'
+import { slowDown } from "express-slow-down";
 
 const rateLimiter = rateLimit({
   windowMs: 1000,
@@ -21,10 +21,10 @@ const rateLimiter = rateLimit({
 });
 
 const throtle = slowDown({
-	windowMs: 5 * 60 * 1000, // 15 minutes
-	delayAfter: 4, // Allow 5 requests per 15 minutes.
-	delayMs: (hits) => hits * 200, // Add 100 ms of delay to every request after the 5th one.
-})
+  windowMs: 5 * 60 * 1000, // 15 minutes
+  delayAfter: 4, // Allow 5 requests per 15 minutes.
+  delayMs: (hits) => hits * 200, // Add 100 ms of delay to every request after the 5th one.
+});
 
 const port = process.env.PORT || 4000;
 
@@ -34,13 +34,29 @@ app.use(helmet());
 // app.use(rateLimiter,throtle);
 app.use(express.json());
 app.use(cookieParser(mySecret));
-app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+
+const allowedOrigins = process.env.CLIENT_URL.split(",");
+console.log(allowedOrigins)
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  }),
+);
 
 await connectDB();
 
-app.get("/",(req,res,next)=>{
-  res.end("Welcome to Your Drive")
-})
+app.get("/", (req, res, next) => {
+  res.end("Welcome to Your Drive");
+});
 app.use("/directory", checkAuth, dirRoutes);
 app.use("/files", checkAuth, fileRoutes);
 app.use("/auth", authRoutes);
