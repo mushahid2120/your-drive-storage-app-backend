@@ -13,6 +13,8 @@ import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { slowDown } from "express-slow-down";
 
+conosle.log(process.env.CLOUDFRONT_KEY.replace(/\\n/g, "\n"),process.env.CLOUDFRONT_KEY.replace(/\\n/g, "\n").length)
+
 const rateLimiter = rateLimit({
   windowMs: 1000,
   limit: 6,
