@@ -6,7 +6,7 @@ const keyPairId = "K1WWF25J0YVIQ7";
 const dateLessThan = new Date(Date.now() + 5 * 60 * 1000).toISOString()
 
 const cloudfrontSignedUrl = (s3ObjectKey, filename, download = false) => {
-  const url = `${cloudfrontDistributionDomain}/${s3ObjectKey}?download=${download}&filename=${filename}`;
+  const url = `${cloudfrontDistributionDomain}/${s3ObjectKey}?download=${download}&filename=${encodeURIComponent(filename)}`;
 
   const signedUrl = getSignedUrl({
     url,
