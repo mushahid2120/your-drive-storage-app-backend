@@ -1,7 +1,7 @@
 import { getSignedUrl } from "@aws-sdk/cloudfront-signer";
 
 const cloudfrontDistributionDomain = "https://d24gtp8x4ffd63.cloudfront.net";
-const privateKey = process.env.CLOUDFRONT_KEY;
+const privateKey = process.env.CLOUDFRONT_KEY.replace(/\\n/g, "\n");
 const keyPairId = "K1WWF25J0YVIQ7";
 const dateLessThan = new Date(Date.now() + 5 * 60 * 1000).toISOString()
 
