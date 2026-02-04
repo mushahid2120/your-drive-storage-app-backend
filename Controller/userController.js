@@ -25,7 +25,6 @@ export const clearCookieConfig = {
   secure: true,
 };
 
-console.log(process.env)
 
 export const signup = async (req, res, next) => {
   const { success, data, error } = signUpSchema.safeParse(req.body);
