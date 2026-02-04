@@ -1,3 +1,4 @@
+import './config/env.js'
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -21,9 +22,9 @@ const rateLimiter = rateLimit({
 });
 
 const throtle = slowDown({
-  windowMs: 5 * 60 * 1000, // 15 minutes
-  delayAfter: 4, // Allow 5 requests per 15 minutes.
-  delayMs: (hits) => hits * 200, // Add 100 ms of delay to every request after the 5th one.
+  windowMs: 5 * 60 * 1000,
+  delayAfter: 4,
+  delayMs: (hits) => hits * 200,
 });
 
 const port = process.env.PORT || 4000;
@@ -32,11 +33,12 @@ const app = express();
 app.use(helmet());
 
 // app.use(rateLimiter,throtle);
+app.use(rateLimiter)
 app.use(express.json());
 app.use(cookieParser(mySecret));
 
 const allowedOrigins = process.env.CLIENT_URL.split(",");
-console.log(allowedOrigins)
+
 app.use(
   cors({
     origin: function (origin, callback) {
