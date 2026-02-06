@@ -2,7 +2,7 @@ import path from "path";
 import { ObjectId } from "mongodb";
 import Files from "../Model/fileModel.js";
 import Dir from "../Model/dirModel.js";
-import { purify, updateDirSize } from "./dirController.js";
+import {  updateDirSize } from "./dirController.js";
 import mongoose from "mongoose";
 import {
   createPutSignUrl,
@@ -64,11 +64,9 @@ export const uploadFileInit = async (req, res, next) => {
       .select("size")
       .lean();
 
-    const cleanFileName = purify.sanitize(filename);
-    const cleanFileSize = purify.sanitize(filesize);
-    const extension = path.extname(cleanFileName);
+    const extension = path.extname(filename);
 
-    if (req.user.capacity - rootDirData.size < +cleanFileSize) {
+    if (req.user.capacity - rootDirData.size < +filesize) {
       return res
         .status(517)
         .json({ error: "You don't have storage enough storage" });
@@ -94,7 +92,7 @@ export const uploadFileInit = async (req, res, next) => {
       name: cleanFileName,
       parentDirId,
       userId: req.user._id,
-      size: cleanFileSize,
+      size: filesize,
     });
 
     const url = await createPutSignUrl(fileFullName, filetype);
@@ -150,7 +148,6 @@ export const uploadFileComplete = async (req, res, next) => {
 export const renameFile = async (req, res, next) => {
   const id = req.params.id;
   const newFileName = req.body?.newfilename;
-  const cleanNewFileName = purify.sanitize(newFileName);
   try {
     const fileData = await Files.findById(id).lean();
     if (!fileData) {
@@ -162,11 +159,11 @@ export const renameFile = async (req, res, next) => {
       .json({ error: "You don't have permission to update file name" });
     }
 
-    if (!cleanNewFileName) {
+    if (!newFileName) {
       return res.status(401).json({ error: "invalid File name" });
     }
 
-    await Files.updateOne({ _id: id }, { name: cleanNewFileName });
+    await Files.updateOne({ _id: id }, { name: newFileName });
     return res.json({ message: "File Renamed Successfully" });
   } catch (error) {
     if (error.name === "ValidationError") {

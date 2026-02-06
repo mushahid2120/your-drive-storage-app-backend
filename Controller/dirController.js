@@ -2,14 +2,8 @@ import { rm } from "fs/promises";
 import { ObjectId } from "mongodb";
 import Dir from "../Model/dirModel.js";
 import Files from "../Model/fileModel.js";
-import { JSDOM } from "jsdom";
-import DOMPurify from "dompurify";
 import mongoose from "mongoose";
 import { deleteMultipleObjects } from "../service/aws_s3.js";
-
-
-const window = new JSDOM("").window;
-export const purify = DOMPurify(window);
 
 //Get Directory Items
 export const getAllDir = async (req, res) => {
@@ -53,7 +47,6 @@ export const createDir = async (req, res, next) => {
       : req.params.parentDirId;
 
   const foldername = req.body?.foldername || "untitle";
-  const cleanFolderName = purify.sanitize(foldername);
 
   try {
     const dirId = new mongoose.Types.ObjectId();
@@ -72,7 +65,7 @@ export const createDir = async (req, res, next) => {
     const result = await Dir.insertOne({
       _id: dirId,
       userId: req.user._id,
-      name: cleanFolderName,
+      name: foldername,
       parentDirId,
       path: [...parentDirData.path, dirId],
     });
@@ -92,7 +85,6 @@ export const createDir = async (req, res, next) => {
 export const renameDir = async (req, res, next) => {
   const folderId = req.params?.folderId;
   const newFolderName = req.body?.newfoldername;
-  const cleanNewFolderName = purify.sanitize(newFolderName);
 
   try {
     const dirData=await Dir.findById(folderId).select('userId _id').lean()
@@ -103,7 +95,7 @@ export const renameDir = async (req, res, next) => {
     if (newFolderName)
       await Dir.updateOne(
         { _id: folderId, userId: req.user._id },
-        { name: cleanNewFolderName }
+        { name: newFolderName }
       );
     return res.json({ message: "Folder Renamed Succussfully " });
   } catch (error) {
