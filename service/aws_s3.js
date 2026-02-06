@@ -9,9 +9,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 const aws_cred = isLambda
-  ? {
-      region: process.env.AWS_REGION,
-    }
+  ? {}
   : {
       region: process.env.AWS_REGION,
       credentials: {
