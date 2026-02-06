@@ -5,7 +5,7 @@ import Files from "../Model/fileModel.js";
 import { JSDOM } from "jsdom";
 import DOMPurify from "dompurify";
 import mongoose from "mongoose";
-import { deleteMultipleObjects } from "../config/aws_s3.js";
+import { deleteMultipleObjects } from "../service/aws_s3.js";
 
 
 const window = new JSDOM("").window;

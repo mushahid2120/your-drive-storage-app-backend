@@ -8,8 +8,8 @@ import {
   createPutSignUrl,
   deleteMultipleObjects,
   verifyS3Object,
-} from "../config/aws_s3.js";
-import cloudfrontSignedUrl from "../config/aws_cf.js";
+} from "../service/aws_s3.js";
+import cloudfrontSignedUrl from "../service/aws_cf.js";
 
 //Get file
 export const getFile = async (req, res, next) => {
