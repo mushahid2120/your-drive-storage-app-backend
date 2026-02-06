@@ -7,13 +7,19 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_KEY_ID,
-  },
-});
+const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+const aws_cred = isLambda
+  ? {
+      region: process.env.AWS_REGION,
+    }
+  : {
+      region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_KEY_ID,
+      },
+    };
+const s3Client = new S3Client(aws_cred);
 if (!s3Client) console.log("AWS Connection failed");
 
 const Bucket = process.env.BUCKET_NAME;
