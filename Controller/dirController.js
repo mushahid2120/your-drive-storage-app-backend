@@ -16,8 +16,6 @@ export const getAllDir = async (req, res) => {
   const id = req.params?.id || req.user.rootDirId._id;
   const userId = req.user._id;
 
-  console.log(`GET DIR DATA OF USER:${req.user.name} OF THIS ID: ${id}`);
-
   const directoryData = await Dir.findOne({
     _id: new ObjectId(id),
     userId: userId,
@@ -29,9 +27,6 @@ export const getAllDir = async (req, res) => {
     .select("-userId -__v")
     .lean();
   if (!directoryData) {
-    console.log(
-      `Unauthorized Access to this Folder: ${id} by user: ${req.user.name}`
-    );
     return res.status(404).json({ error: "You don't have any access" });
   }
 
@@ -60,8 +55,6 @@ export const createDir = async (req, res, next) => {
   const foldername = req.body?.foldername || "untitle";
   const cleanFolderName = purify.sanitize(foldername);
 
-  console.log(`CREATING DIR: ${cleanFolderName} BY USER ${req.user.name}`);
-
   try {
     const dirId = new mongoose.Types.ObjectId();
     const parentDirData = await Dir.findById(parentDirId)
@@ -69,14 +62,10 @@ export const createDir = async (req, res, next) => {
       .lean();
 
     if (!parentDirData){
-      console.log(`parent Dir is not present of this Id : ${parentDirId}`)
       return res
         .status(404)
         .json({ error: "Parent Dir is not folder" });}
-    
-    console.log(parentDirData)
     if(!parentDirData.userId.equals(req.user._id)){
-      console.log(`${req.user.name} unathorized to create directory`)
       return res.status(404).json( {error: "Unauthorized Access"})
     }
 
@@ -105,15 +94,11 @@ export const renameDir = async (req, res, next) => {
   const newFolderName = req.body?.newfoldername;
   const cleanNewFolderName = purify.sanitize(newFolderName);
 
-  console.log(`${req.user.name} IS RENAME FOLDER ${folderId}`)
-
   try {
     const dirData=await Dir.findById(folderId).select('userId _id').lean()
     if(!dirData){ 
-      console.log(`${req.user.name} is to find this folder Id: ${folderId} is not exist`)
       return res.status(404).json({error: 'Dir is not Found..'})}
     if(!dirData.userId.equals(req.user._id)) {
-      console.log(`${req.user.name} is not authorized to rename dir: ${dirData.id}`)
       return res.status(404).json({error: "Unauthorized to Rename this dirctory"})}
     if (newFolderName)
       await Dir.updateOne(
@@ -129,7 +114,6 @@ export const renameDir = async (req, res, next) => {
 
 export const deleteDir = async (req, res, next) => {
   const folderId = req.params.folderId;
-  console.log(`${req.user.name}  IS  DELETE DIR ID: ${folderId}`)
   try {
     const parentDirData = await Dir.findOne({
       _id: folderId,
@@ -138,12 +122,10 @@ export const deleteDir = async (req, res, next) => {
       .lean();
     
     if(!parentDirData){
-      console.log(`Directory is not found to delete folderId: ${folderId}`)
       return res.status(404).json({error: "Directory not Found"})
     }
 
     if(!parentDirData.userId.equals(req.user._id)){
-      console.log(`${req.user.name} is not authorized to delete this folderId : ${folderId}`)
       return res.status(404).json({error: "Not Authorized to Delete this Dir"})
     }
 

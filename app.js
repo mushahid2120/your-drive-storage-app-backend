@@ -1,4 +1,3 @@
-import './config/env.js'
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -6,7 +5,6 @@ import fileRoutes from "./routes/fileRoutes.js";
 import dirRoutes from "./routes/dirRoutes.js";
 import authRoutes from "./routes/userRoutes.js";
 import checkAuth from "./middleware/authCheckMW.js";
-import connectDB from "./config/db.js";
 import { mySecret } from "./Controller/userController.js";
 import otpRouter from "./routes/otpRoutes.js";
 import { rateLimit } from "express-rate-limit";
@@ -27,9 +25,9 @@ const throtle = slowDown({
   delayMs: (hits) => hits * 200,
 });
 
-const port = process.env.PORT || 4000;
 
 const app = express();
+
 app.use(helmet());
 
 // app.use(rateLimiter,throtle);
@@ -54,7 +52,6 @@ app.use(
   }),
 );
 
-await connectDB();
 
 app.get("/", (req, res, next) => {
   res.end("Welcome to Your Drive");
@@ -70,6 +67,5 @@ app.use((err, req, res, next) => {
   return res.status(req.status || 500).json({ error: "something-went-wrong" });
 });
 
-app.listen(port, () => {
-  console.log("Server is Running on port number 4000");
-});
+
+export default app;

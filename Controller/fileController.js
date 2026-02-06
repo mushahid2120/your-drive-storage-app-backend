@@ -21,13 +21,9 @@ export const getFile = async (req, res, next) => {
       userId: req.user._id,
     }).lean();
     if (!parentDirData) {
-      console.log(
-        `${req.user.name} is not authorized to access this file: ${id}`,
-      );
       return res.status(401).json({ error: "You don't hav access" });
     }
     if (!fileData) {
-      console.log(`${id} File is not found`);
       return res.status(404).send("File Not Found");
     }
     const fileFullName = `${id}${fileData.extension}`;
@@ -38,12 +34,10 @@ export const getFile = async (req, res, next) => {
         fileData.name,
         true,
       );
-      console.log(`${fileData.name} is Downloading by ${req.user.name}`);
       return res.redirect(cfSignedUrl);
     }
     // const getUrl = await createGetSignUrl(fileFullName, false, fileData.name);
     const cfSignedUrl = cloudfrontSignedUrl(fileFullName, fileData.name);
-    console.log(`${req.user.name} req for getUrl of file ${fileData.name}`);
     return res.redirect(cfSignedUrl);
   } catch (error) {
     console.log(error);
@@ -58,7 +52,6 @@ export const uploadFileInit = async (req, res, next) => {
   const { filename, filesize, filetype } = req.body;
 
   if (!filesize || +filesize > 100 * 1000 * 1000) {
-    console.log(`${req.user.name} trying to upload file bigger that 100mb`);
     return res
       .status(413)
       .json({ error: "File is Too big please upload below 100mb" });
@@ -76,7 +69,6 @@ export const uploadFileInit = async (req, res, next) => {
     const extension = path.extname(cleanFileName);
 
     if (req.user.capacity - rootDirData.size < +cleanFileSize) {
-      console.log(`${req.user.name} file upload .not enough space `);
       return res
         .status(517)
         .json({ error: "You don't have storage enough storage" });
@@ -89,9 +81,6 @@ export const uploadFileInit = async (req, res, next) => {
       .lean();
 
     if (!parentDirData.userId.equals(req.user._id)) {
-      console.log(
-        `${req.user.name} is not authorized to uplaod file initiated`,
-      );
       return res
         .status(403)
         .json({ error: "You don't have permission to upload file directly" });
@@ -109,7 +98,6 @@ export const uploadFileInit = async (req, res, next) => {
     });
 
     const url = await createPutSignUrl(fileFullName, filetype);
-    console.log("${req.user.name} IS INITIATED FILE UPLAODING ");
     return res.status(200).json({ url, fileId: fileId.toString() });
   } catch (error) {
     console.log(error);
@@ -135,7 +123,6 @@ export const uploadFileComplete = async (req, res, next) => {
     .lean();
 
   if (!fileData.userId.equals(req.user._id)) {
-    console.log(`${req.user.name} is not authorized to uplaod file submit`);
     return res
       .status(403)
       .json({ error: "You don't have permission to update file directly" });
@@ -146,13 +133,11 @@ export const uploadFileComplete = async (req, res, next) => {
     const objSize = await verifyS3Object(fileFullName);
 
     if (objSize !== filesize) {
-      console.log(`${fileData.name} size not matched with uplaoded file`);
       await fileData.deleteOne();
       res.json({ message: "File Size is match" });
     }
     await fileData.updateOne({ isUploading: false });
     updateDirSize(parentDirData.path, filesize);
-    console.log(`${fileData.name} is uploaded successfully`);
     res.json({ message: "File Uploaded Successfully" });
   } catch (error) {
     await fileData.deleteOne();
@@ -169,20 +154,19 @@ export const renameFile = async (req, res, next) => {
   try {
     const fileData = await Files.findById(id).lean();
     if (!fileData) {
-      console.log(`${id} File is not Found in Db`);
       return res.status(405).json({ error: "File not Found" });
     }
     if (!fileData.userId.equals(req.user._id)) {
-      console.log(`${req.user.name} is not authorized to access ${id}`);
+          return res
+      .status(403)
+      .json({ error: "You don't have permission to update file name" });
     }
 
     if (!cleanNewFileName) {
-      console.log(`${req.user.name} provided invalid file name fileId: ${id}`);
       return res.status(401).json({ error: "invalid File name" });
     }
 
     await Files.updateOne({ _id: id }, { name: cleanNewFileName });
-    console.log(`${req.user.name} is renamed the file ${id}`);
     return res.json({ message: "File Renamed Successfully" });
   } catch (error) {
     if (error.name === "ValidationError") {
@@ -204,12 +188,10 @@ export const deleteFile = async (req, res, next) => {
       .select("parentDirId size extension userId")
       .lean();
     if (!fileData) {
-      console.log(`${id} file not found to delete`);
       return res.status(404).json({ error: "Deleting File not Found" });
     }
 
     if (!fileData.userId.equals(req.user._id)) {
-      console.log(`${req.user.name} is trying to delete file ${id}`);
       return res
         .status(403)
         .json({ error: "Not authorized to delete this file " });
