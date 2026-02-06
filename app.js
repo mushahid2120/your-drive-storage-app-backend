@@ -11,13 +11,6 @@ import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { slowDown } from "express-slow-down";
 
-const rateLimiter = rateLimit({
-  windowMs: 1000,
-  limit: 6,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: "Too Many Req...",
-});
 
 const throtle = slowDown({
   windowMs: 5 * 60 * 1000,
@@ -31,6 +24,16 @@ const app = express();
 app.use(helmet());
 
 // app.use(rateLimiter,throtle);
+app.set("trust proxy", 1);
+
+const rateLimiter = rateLimit({
+  windowMs: 1000,
+  limit: 6,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: "Too Many Req...",
+});
+
 app.use(rateLimiter)
 app.use(express.json());
 app.use(cookieParser(mySecret));
