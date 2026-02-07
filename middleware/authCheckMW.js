@@ -7,17 +7,14 @@ export default async function checkAuth(req, res, next) {
     const { sid } = req.signedCookies;
     //signature matched (true) if failed (false)
     if (sid === false){
-      console.log("Signature not matched")
       res.clearCookie("sid", clearCookieConfig);}
     if (!sid){
-        console.log("Not Logged in")
        return res.status(401).json({ error: "Not Logged In..." });}
 
     const session = await Session.findById(sid);
     // const session=await redisClient.json.get(`session:${sid}`)
 
     if (!session) {
-      console.log("Sessioon has been Expired or Invalid Session")
       res.clearCookie("sid", clearCookieConfig);
       return res
         .status(401)
@@ -29,7 +26,6 @@ export default async function checkAuth(req, res, next) {
       .populate({ path: "rootDirId" ,select: "_id size name"})
       .lean();
     if (!user) {
-      console.log("User not found .User not Logged In")
       return res.status(401).json({ error: "Not Logged In" });}
     req.user = user;
 
