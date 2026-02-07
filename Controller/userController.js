@@ -5,9 +5,10 @@ import Session from "../Model/sessionModel.js";
 import { verifyOtp } from "../service/sendOtp.js";
 import { OAuth2Client } from "google-auth-library";
 import Files from "../Model/fileModel.js";
-import { rm } from "fs/promises";
 import { loginSchema, signUpSchema } from "../validator/authSchemaZod.js";
 import z from "zod";
+import { FieldLevelEncryptionProfileSummary$ } from "@aws-sdk/client-cloudfront";
+import { deleteMultipleObjects } from "../service/aws_s3.js";
 // import redisClient from "../config/redis.jsames";
 
 export const mySecret = process.env.SESSION_SECRET;
@@ -288,12 +289,12 @@ export const hardDeleteUser = async (req, res, next) => {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
-    const findfiles = await Files.find({ userId });
-    for await (const file of findfiles) {
-      const fileName = file._id.toString() + file.extension;
-      await rm(`./GDrive/${fileName}`);
+    const findfiles = await Files.find({ userId }).lean();
+    const deletableKeys = findfiles.map(
+      (file) => file._id.toString() + file.extension
+    );
+    if (deletableKeys.length !== 0) await deleteMultipleObjects(deletableKeys);
       const dirdeleteresult = await Dir.deleteMany({ userId });
-    }
     await Files.deleteMany({ userId });
     await Session.deleteMany({ userId });
     await Users.findByIdAndDelete(userId);
