@@ -200,12 +200,10 @@ export const deleteFile = async (req, res, next) => {
     const fileFullName = `${id}${fileData.extension}`;
     const { Errors } = await deleteMultipleObjects([fileFullName]);
     if (Errors) {
-      console.log(`${id} unable to delte file`);
       return res.status(400).json({ error: "File Could not delete" });
     }
     await Files.findByIdAndDelete(id);
     await updateDirSize(parentDirData.path, -fileData.size);
-    console.log(`${id} FILE DELTED SUCCESSFULLY`);
     return res.json({ message: "File Deleted" });
   } catch (error) {
     console.log(error);
