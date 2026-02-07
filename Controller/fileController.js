@@ -89,7 +89,7 @@ export const uploadFileInit = async (req, res, next) => {
     const fileCreated = await Files.insertOne({
       _id: fileId,
       extension,
-      name: cleanFileName,
+      name: filename,
       parentDirId,
       userId: req.user._id,
       size: filesize,
