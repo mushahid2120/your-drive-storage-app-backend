@@ -10,6 +10,8 @@ import otpRouter from "./routes/otpRoutes.js";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { slowDown } from "express-slow-down";
+import subscriptionRouter from "./routes/subscriptionRoutes.js";
+import webhooksRouter from "./routes/webhooksRoutes.js";
 
 
 const throtle = slowDown({
@@ -63,6 +65,8 @@ app.use("/directory", checkAuth, dirRoutes);
 app.use("/files", checkAuth, fileRoutes);
 app.use("/auth", authRoutes);
 app.use("/otp", otpRouter);
+app.use("/webhooks",webhooksRouter)
+app.use("/subscriptions",subscriptionRouter)
 
 app.use((err, req, res, next) => {
   console.log("Global error handler");

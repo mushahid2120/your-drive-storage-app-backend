@@ -147,6 +147,8 @@ const dirResult = await db.command({
   validationLevel: "strict",
 });
 
+
+
 console.log({ userResult, fileResult, dirResult });
 
 await mongoose.disconnect();
