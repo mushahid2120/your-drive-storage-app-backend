@@ -70,7 +70,7 @@ export const signup = async (req, res, next) => {
       { session },
     );
 
-    session.commitTransaction();
+    await session.commitTransaction();
     res.json({ message: "User Created" });
   } catch (error) {
     await session.abortTransaction();
@@ -94,6 +94,8 @@ export const signup = async (req, res, next) => {
     }
     console.log(error);
     next(error);
+  } finally {
+    session.endSession();
   }
 };
 
@@ -152,7 +154,7 @@ export const logout = async (req, res, next) => {
   try {
     const { sid } = req.signedCookies;
     if (!sid) return res.status(401).json({ error: "Session not found" });
-     await Session.findByIdAndDelete(sid);
+    await Session.findByIdAndDelete(sid);
     res.clearCookie("sid", clearCookieConfig);
     res.json({ message: "Logout Successfully" });
   } catch (error) {
@@ -164,6 +166,7 @@ export const logout = async (req, res, next) => {
 export const logoutAll = async (req, res, error) => {
   try {
     const { sid } = req.signedCookies;
+    if (!sid) return res.status(401).json({ error: "Session not found" });
     const session = await Session.findById(sid);
     await Session.deleteMany({ userId: session.userId });
     res.clearCookie("sid", clearCookieConfig);
@@ -186,37 +189,37 @@ export const getUser = (req, res) => {
 };
 
 export const loginWithGoogle = async (req, res, next) => {
+  const idToken = req.body.credential;
+  const client = new OAuth2Client();
+  const googleUser = await client.verifyIdToken({
+    idToken,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+  if (!googleUser) {
+    return res.status(403).json({ error: "User verifiction failed" });
+  }
+  const { email, picture, name } = googleUser.getPayload();
+  const dbUser = await Users.findOne({ email }).lean();
+  if (dbUser) {
+    if (dbUser.deleted) {
+      return res.status(402).json({
+        error: "You accout has been deleted please contact for recovery",
+      });
+    }
+    const allSession = await Session.find({ userId: dbUser._id });
+    if (allSession.length > 3) await allSession[0].deleteOne();
+
+    const session = await Session.create({ userId: dbUser._id });
+
+    res.cookie("sid", session.id, cookieCofig);
+    return res.json({ error: "Login but user already Exist" });
+  }
+  const userId = new mongoose.Types.ObjectId();
+  const dirId = new mongoose.Types.ObjectId();
+
+  const dbSession = await mongoose.startSession();
+
   try {
-    const idToken = req.body.credential;
-    const client = new OAuth2Client();
-    const googleUser = await client.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    if (!googleUser) {
-      return res.status(403).json({ error: "User verifiction failed" });
-    }
-    const { email, picture, name } = googleUser.getPayload();
-    const dbUser = await Users.findOne({ email }).lean();
-    if (dbUser) {
-      if (dbUser.deleted) {
-        return res.status(402).json({
-          error: "You accout has been deleted please contact for recovery",
-        });
-      }
-      const allSession = await Session.find({ userId: dbUser._id });
-      if (allSession.length > 3) await allSession[0].deleteOne();
-
-      const session = await Session.create({ userId: dbUser._id });
-
-      res.cookie("sid", session.id, cookieCofig);
-      return res.json({ error: "Login but user already Exist" });
-    }
-    const userId = new mongoose.Types.ObjectId();
-    const dirId = new mongoose.Types.ObjectId();
-
-    const dbSession = await mongoose.startSession();
-
     dbSession.startTransaction();
     await Dir.create(
       {
@@ -224,7 +227,7 @@ export const loginWithGoogle = async (req, res, next) => {
         name: `root-${email}`,
         userId: userId,
       },
-      { dbSession },
+      { session: dbSession },
     );
 
     await Users.create(
@@ -235,19 +238,21 @@ export const loginWithGoogle = async (req, res, next) => {
         rootDirId: dirId,
         picture,
       },
-      { dbSession },
+      { session: dbSession },
     );
 
     const session = await Session.create({ userId });
 
     res.cookie("sid", session.id, cookieCofig);
 
-    dbSession.commitTransaction();
+    await dbSession.commitTransaction();
     return res.json({ message: "User Created" });
   } catch (error) {
-    dbSession.abortTransaction();
+    await dbSession.abortTransaction();
     console.log(error);
     next(error);
+  } finally {
+    dbSession.endSession();
   }
 };
 
