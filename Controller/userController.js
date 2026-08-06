@@ -7,9 +7,7 @@ import { OAuth2Client } from "google-auth-library";
 import Files from "../Model/fileModel.js";
 import { loginSchema, signUpSchema } from "../validator/authSchemaZod.js";
 import z from "zod";
-import { FieldLevelEncryptionProfileSummary$ } from "@aws-sdk/client-cloudfront";
 import { deleteMultipleObjects } from "../service/aws_s3.js";
-// import redisClient from "../config/redis.jsames";
 
 export const mySecret = process.env.SESSION_SECRET;
 export const cookieCofig = {
@@ -26,7 +24,6 @@ export const clearCookieConfig = {
   secure: true,
 };
 
-
 export const signup = async (req, res, next) => {
   const { success, data, error } = signUpSchema.safeParse(req.body);
   if (!success) {
@@ -36,7 +33,7 @@ export const signup = async (req, res, next) => {
           acc[key] = z.flattenError(error).fieldErrors[key];
           return acc;
         },
-        {}
+        {},
       ),
     });
   }
@@ -53,16 +50,16 @@ export const signup = async (req, res, next) => {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
-    await Dir.insertOne(
+    await Dir.create(
       {
         _id: dirId,
         name: `root-${email}`,
         userId: userId,
       },
-      { session }
+      { session },
     );
 
-    await Users.insertOne(
+    await Users.create(
       {
         _id: userId,
         name,
@@ -70,7 +67,7 @@ export const signup = async (req, res, next) => {
         password,
         rootDirId: dirId,
       },
-      { session }
+      { session },
     );
 
     session.commitTransaction();
@@ -115,7 +112,7 @@ export const login = async (req, res, next) => {
     }
     if (user.deleted) {
       return res.status(402).json({
-        error: "You accout has been delted please contact for recovery",
+        error: "You account has been deleted please contact for recovery",
       });
     }
     const isPasswordValid = await user.comparePassword(password);
@@ -154,9 +151,10 @@ export const login = async (req, res, next) => {
 export const logout = async (req, res, next) => {
   try {
     const { sid } = req.signedCookies;
-    const deletedSession = await Session.findByIdAndDelete(sid);
+    if (!sid) return res.status(401).json({ error: "Session not found" });
+     await Session.findByIdAndDelete(sid);
     res.clearCookie("sid", clearCookieConfig);
-    res.json({ message: "Logout Successfull" });
+    res.json({ message: "Logout Successfully" });
   } catch (error) {
     console.log(error);
     next(error);
@@ -188,47 +186,48 @@ export const getUser = (req, res) => {
 };
 
 export const loginWithGoogle = async (req, res, next) => {
-  const idToken = req.body.credential;
-  const client = new OAuth2Client();
-  const googleUser = await client.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-  if (!googleUser) {
-    return res.staus(403).json({ error: "User verifaction failed" });
-  }
-  const { email, picture, name } = googleUser.getPayload();
-  const dbUser = await Users.findOne({ email }).lean();
-  if (dbUser) {
-    if (dbUser.deleted) {
-      return res.status(402).json({
-        error: "You accout has been deleted please contact for recovery",
-      });
-    }
-    const allSession = await Session.find({ userId: dbUser._id });
-    if (allSession.length > 3) await allSession[0].deleteOne();
-
-    const session = await Session.create({ userId: dbUser._id });
-
-    res.cookie("sid", session.id, cookieCofig);
-    return res.json({ error: "Login but user already Exist" });
-  }
-  const userId = new mongoose.Types.ObjectId();
-  const dirId = new mongoose.Types.ObjectId();
-
-  const dbSession = await mongoose.startSession();
   try {
+    const idToken = req.body.credential;
+    const client = new OAuth2Client();
+    const googleUser = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    if (!googleUser) {
+      return res.status(403).json({ error: "User verifiction failed" });
+    }
+    const { email, picture, name } = googleUser.getPayload();
+    const dbUser = await Users.findOne({ email }).lean();
+    if (dbUser) {
+      if (dbUser.deleted) {
+        return res.status(402).json({
+          error: "You accout has been deleted please contact for recovery",
+        });
+      }
+      const allSession = await Session.find({ userId: dbUser._id });
+      if (allSession.length > 3) await allSession[0].deleteOne();
+
+      const session = await Session.create({ userId: dbUser._id });
+
+      res.cookie("sid", session.id, cookieCofig);
+      return res.json({ error: "Login but user already Exist" });
+    }
+    const userId = new mongoose.Types.ObjectId();
+    const dirId = new mongoose.Types.ObjectId();
+
+    const dbSession = await mongoose.startSession();
+
     dbSession.startTransaction();
-    await Dir.insertOne(
+    await Dir.create(
       {
         _id: dirId,
         name: `root-${email}`,
         userId: userId,
       },
-      { dbSession }
+      { dbSession },
     );
 
-    await Users.insertOne(
+    await Users.create(
       {
         _id: userId,
         name,
@@ -236,7 +235,7 @@ export const loginWithGoogle = async (req, res, next) => {
         rootDirId: dirId,
         picture,
       },
-      { dbSession }
+      { dbSession },
     );
 
     const session = await Session.create({ userId });
@@ -291,10 +290,10 @@ export const hardDeleteUser = async (req, res, next) => {
     session.startTransaction();
     const findfiles = await Files.find({ userId }).lean();
     const deletableKeys = findfiles.map(
-      (file) => file._id.toString() + file.extension
+      (file) => file._id.toString() + file.extension,
     );
     if (deletableKeys.length !== 0) await deleteMultipleObjects(deletableKeys);
-      const dirdeleteresult = await Dir.deleteMany({ userId });
+    const dirdeleteresult = await Dir.deleteMany({ userId });
     await Files.deleteMany({ userId });
     await Session.deleteMany({ userId });
     await Users.findByIdAndDelete(userId);

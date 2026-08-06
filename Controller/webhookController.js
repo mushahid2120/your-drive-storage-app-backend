@@ -15,7 +15,7 @@ export const handleRazorpayWebhook = async (req, res, next) => {
       razorpaySecret,
     );
     if (!isSignatureValid) {
-      res.status(400).json({ error: "Signature verification failed" });
+      return res.status(400).json({ error: "Signature verification failed" });
     }
     const userId = req.body.payload.payment.entity.notes.userId;
     const subs = await Subscription.findOne({ userId });
