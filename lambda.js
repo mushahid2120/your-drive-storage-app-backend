@@ -4,5 +4,6 @@ import connectDB from "./config/db.js";
 import app from "./app.js"
 
 await connectDB();
+await redisClient.connect();
 
 export const handler = serverless(app);
