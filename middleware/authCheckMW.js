@@ -1,5 +1,6 @@
+import redisClient from "../config/redis.js";
 import { clearCookieConfig } from "../Controller/userController.js";
-import Session from "../Model/sessionModel.js";
+// import Session from "../Model/sessionModel.js";
 import Users from "../Model/userModel.js";
 
 export default async function checkAuth(req, res, next) {
@@ -11,10 +12,12 @@ export default async function checkAuth(req, res, next) {
     if (!sid){
        return res.status(401).json({ error: "Not Logged In..." });}
 
-    const session = await Session.findById(sid);
+    // const session = await Session.findById(sid);
+    const userId=await redisClient.hGet(`SessionsBySessionID:${sid}`,"userId");
+
     // const session=await redisClient.json.get(`session:${sid}`)
 
-    if (!session) {
+    if (!userId) {
       res.clearCookie("sid", clearCookieConfig);
       return res
         .status(401)
@@ -22,7 +25,7 @@ export default async function checkAuth(req, res, next) {
     }
 
     //finding User from database
-    const user = await Users.findOne({ _id: session.userId, deleted: false })
+    const user = await Users.findOne({ _id: userId, deleted: false })
       .populate({ path: "rootDirId" ,select: "_id size name"})
       .lean();
     if (!user) {

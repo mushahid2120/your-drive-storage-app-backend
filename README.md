@@ -2,7 +2,7 @@
 
 # Your Drive — Backend
 
-A secure, session-based storage backend built with Node.js, Express, and MongoDB — supporting direct-to-S3 uploads, CloudFront signed downloads, OTP email signup, Google login, paid subscription plans via Razorpay, and admin operations.
+A secure, session-based storage backend built with Node.js, Express, MongoDB, and Redis — supporting direct-to-S3 uploads, CloudFront signed downloads, OTP email signup, Google login, paid subscription plans via Razorpay, and admin operations.
 
 <a href="https://cf.mushahidjs.dpdns.org">
   <h2 style="display: inline;">Live Demo 🚀</h2>
@@ -12,7 +12,7 @@ A secure, session-based storage backend built with Node.js, Express, and MongoDB
 
 ### Core Features
 - **Authentication**: email/password signup with OTP verification, session-based login, and Google OAuth login
-- **Session management**: server-side sessions (not just stateless JWT) backed by a `Session` collection, so sessions can be invalidated on demand — includes "logout" and "logout all devices"
+- **Redis-powered session management**: session IDs are stored in Redis and mapped to user IDs for fast authentication checks, logout, logout-all, and admin force logout flows
 - **File storage**: direct-to-S3 uploads (client uploads straight to S3 via a pre-signed URL, not proxied through the server), CloudFront signed URLs for secure downloads, rename/delete with storage accounting
 - **Directory management**: nested folders, rename, and recursive delete with storage quota recalculation
 - **Subscription & billing**: Razorpay-powered checkout for Pro/Premium plans (monthly or yearly billing), plan upgrades, and cancellation — each plan maps to an increased storage quota
@@ -31,7 +31,7 @@ A secure, session-based storage backend built with Node.js, Express, and MongoDB
 - **Runtime**: Node.js (ES Modules)
 - **Framework**: Express 5
 - **Database**: MongoDB with Mongoose
-- **Cache/session store**: Redis
+- **Cache/session store**: Redis (used for session metadata, per-user session indexes, and session invalidation)
 - **Auth**: Session cookies (`cookie-parser`), Google OAuth (`google-auth-library`)
 - **File storage**: AWS S3 (`@aws-sdk/client-s3`, `s3-request-presigner`) + AWS CloudFront (`cloudfront-signer`, `client-cloudfront`)
 - **Payments**: Razorpay
@@ -90,7 +90,7 @@ your-drive-storage-app-backend/
 ### Prerequisites
 - Node.js 18+
 - MongoDB (local or cloud instance)
-- Redis
+- Redis instance (required for authentication sessions)
 - AWS account with an S3 bucket + CloudFront distribution
 - Razorpay account (for subscriptions)
 - Brevo account (for OTP emails)
@@ -115,6 +115,10 @@ CLIENT_URL=http://localhost:5173
 SESSION_SECRET=your_session_secret
 COOKIE_SAMESITE=Strict
 
+# Redis
+REDIS_HOST=your_redis_host
+REDIS_PASSWORD=your_redis_password
+
 # AWS
 AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_KEY_ID=your_aws_secret_key
@@ -134,6 +138,8 @@ RAZORPAY_KEY=your_razorpay_key_id
 RAZORPAY_SECRET_KEY=your_razorpay_key_secret
 RAZORPAY_SECRET=your_razorpay_webhook_secret
 ```
+
+> Redis is used as the session store for authenticated users. The app stores session metadata in keys like `SessionsBySessionID:<sid>` and `SessionsByUserID:<userId>` so login checks and logout flows can be resolved quickly and invalidated immediately.
 
 ### Running Locally
 
@@ -188,12 +194,13 @@ npm start          # production start (server.js)
 
 ## 🔐 Authentication
 
-Unlike a pure JWT setup, sessions are server-managed:
+Unlike a pure JWT setup, sessions are server-managed with Redis:
 
 1. **Signup**: user registers, receives an OTP by email, and verifies it before the account is activated
-2. **Login**: email/password or Google OAuth creates a session record and sets a signed, httpOnly session cookie
-3. **Session validation**: `checkAuth` middleware looks up the session on each request
-4. **Revocation**: because sessions are stored server-side, `logout-all` or an admin `logout-user` action takes effect immediately — no waiting for a token to expire
+2. **Login**: email/password or Google OAuth creates a Redis-backed session entry and sets a signed, httpOnly session cookie
+3. **Session validation**: `checkAuth` middleware reads the session ID from the signed cookie and checks Redis for the associated user ID before allowing access
+4. **Revocation**: because sessions are stored in Redis, `logout`, `logout-all`, and admin-side `logout-user` actions invalidate the session immediately across requests
+5. **Multi-device management**: the backend tracks user sessions by user ID and session ID so a user can sign out of a specific device or all devices at once
 
 ## 💳 Payment Integration
 

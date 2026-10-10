@@ -14,11 +14,11 @@ import subscriptionRouter from "./routes/subscriptionRoutes.js";
 import webhooksRouter from "./routes/webhooksRoutes.js";
 
 
-const throtle = slowDown({
-  windowMs: 5 * 60 * 1000,
-  delayAfter: 4,
-  delayMs: (hits) => hits * 200,
-});
+// const throtle = slowDown({
+//   windowMs: 5 * 60 * 1000,
+//   delayAfter: 4,
+//   delayMs: (hits) => hits * 200,
+// });
 
 
 const app = express();

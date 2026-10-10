@@ -1,13 +1,14 @@
 import Users from "../Model/userModel.js";
 import Dir from "../Model/dirModel.js";
 import mongoose from "mongoose";
-import Session from "../Model/sessionModel.js";
+// import Session from "../Model/sessionModel.js";
 import { verifyOtp } from "../service/sendOtp.js";
 import { OAuth2Client } from "google-auth-library";
 import Files from "../Model/fileModel.js";
 import { loginSchema, signUpSchema } from "../validator/authSchemaZod.js";
 import z from "zod";
 import { deleteMultipleObjects } from "../service/aws_s3.js";
+import redisClient from "../config/redis.js";
 
 export const mySecret = process.env.SESSION_SECRET;
 export const cookieCofig = {
@@ -123,26 +124,38 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ error: "Invalid Credentials" });
     }
 
-    const allSession = await Session.find({ userId: user.id });
-    if (allSession.length > 3) await allSession[0].deleteOne();
+    // const allSession = await Session.find({ userId: user.id });
+    // if (allSession.length > 3) await allSession[0].deleteOne();
 
-    const session = await Session.create({ userId: user.id });
+    // const session = await Session.create({ userId: user.id });
 
-    // console.log(`@userId: {${user._id}}`);
-    // const allSession = await redisClient.ft.search(
-    //   "userIdIdx",
-    //   `@userId: {${user._id}}`
-    // );
+    //Checking how many session has active of this user Id
+    const sessionId = crypto.randomUUID();
+    const SessionsBySessionKEY = `SessionsBySessionID:${sessionId}`;
+    const SessionsByUserKEY = `SessionsByUserID:${String(user.id)}`;
+    const sessionList = await redisClient.sMembers(SessionsByUserKEY);
 
-    // if (allSession.total > 1)  await redisClient.del(allSession.documents[0].id);
+    //Set limit to the total number of the session if(sessions are greater then limit delete the first sessions)
 
-    // const sessionId = crypto.randomUUID();
-    // const redisKey = `session:${sessionId}`;
-    // const result = await redisClient.json.set(redisKey, "$", {
-    //   userId: user._id,
-    // });
+    if (sessionList.length > 2) {
+      await redisClient.sRem(SessionsByUserKEY, sessionList[0]);
+      await redisClient.hDel(`SessionsBySessionID:${sessionList[0]}`, "userId");
+    }
 
-    res.cookie("sid", session.id, cookieCofig);
+    //Generating New Session of the this userid
+    await redisClient
+      .multi()
+      .hSet(SessionsBySessionKEY, { userId: String(user.id) })
+      .expire(SessionsBySessionKEY, 60 * 60 * 24)
+      .exec();
+
+    await redisClient
+      .multi()
+      .sAdd(SessionsByUserKEY, String(sessionId))
+      .expire(SessionsByUserKEY, 60 * 60 * 24)
+      .exec();
+
+    res.cookie("sid", sessionId, cookieCofig);
     return res.json({ message: "Login Successful" });
   } catch (error) {
     console.log(error);
@@ -154,7 +167,15 @@ export const logout = async (req, res, next) => {
   try {
     const { sid } = req.signedCookies;
     if (!sid) return res.status(401).json({ error: "Session not found" });
-    await Session.findByIdAndDelete(sid);
+    const userId = await redisClient.hGet(
+      `SessionsBySessionID:${sid}`,
+      "userId",
+    );
+    if (!userId) {
+      return res.status(401).json({ error: "Invalid Session Id" });
+    }
+    await redisClient.del(`SessionsBySessionID:${sid}`);
+    await redisClient.sRem(`SessionsByUserID:${userId}`, String(sid));
     res.clearCookie("sid", clearCookieConfig);
     res.json({ message: "Logout Successfully" });
   } catch (error) {
@@ -167,8 +188,21 @@ export const logoutAll = async (req, res, error) => {
   try {
     const { sid } = req.signedCookies;
     if (!sid) return res.status(401).json({ error: "Session not found" });
-    const session = await Session.findById(sid);
-    await Session.deleteMany({ userId: session.userId });
+    const userId = await redisClient.hGet(
+      `SessionsBySessionID:${sid}`,
+      "userId",
+    );
+    if (!userId) {
+      return res.status(401).json({ error: "Invalid Session Id" });
+    }
+    const sessionList = await redisClient.sMembers(
+      `SessionsByUserID:${userId}`,
+    );
+    sessionList.map((sessionId) =>
+      redisClient.del(`SessionsBySessionID:${sessionId}`),
+    );
+    await Promise.all(sessionList);
+    await redisClient.del(`SessionsByUserID:${userId}`);
     res.clearCookie("sid", clearCookieConfig);
     res.json({ message: "Logout All Successfull" });
   } catch (error) {
@@ -206,12 +240,35 @@ export const loginWithGoogle = async (req, res, next) => {
         error: "You accout has been deleted please contact for recovery",
       });
     }
-    const allSession = await Session.find({ userId: dbUser._id });
-    if (allSession.length > 3) await allSession[0].deleteOne();
+    // const allSession = await Session.find({ userId: dbUser._id });
+    // if (allSession.length > 3) await allSession[0].deleteOne();
 
-    const session = await Session.create({ userId: dbUser._id });
+    // const session = await Session.create({ userId: dbUser._id });
 
-    res.cookie("sid", session.id, cookieCofig);
+    const sessionId = crypto.randomUUID();
+    const SessionsBySessionKEY = `SessionsBySessionID:${sessionId}`;
+    const SessionsByUserKEY = `SessionsByUserID:${String(dbUser._id)}`;
+    const sessionList = await redisClient.sMembers(SessionsByUserKEY);
+
+    if (sessionList.length > 2) {
+      await redisClient.sRem(SessionsByUserKEY, sessionList[0]);
+      await redisClient.hDel(`SessionsBySessionID:${sessionList[0]}`, "userId");
+    }
+
+    //Generating New Session of the this userid
+    await redisClient
+      .multi()
+      .hSet(SessionsBySessionKEY, { userId: String(dbUser._id) })
+      .expire(SessionsBySessionKEY, 60 * 60 * 24)
+      .exec();
+
+    await redisClient
+      .multi()
+      .sAdd(SessionsByUserKEY, String(sessionId))
+      .expire(SessionsByUserKEY, 60 * 60 * 24)
+      .exec();
+
+    res.cookie("sid", sessionId, cookieCofig);
     return res.json({ error: "Login but user already Exist" });
   }
   const userId = new mongoose.Types.ObjectId();
@@ -259,9 +316,9 @@ export const loginWithGoogle = async (req, res, next) => {
 export const getAllUsers = async (req, res, next) => {
   try {
     const allUsers = await Users.find({ deleted: false }).lean();
-    const allSession = await Session.find().lean();
 
-    const allSessionUserId = allSession.map(({ userId }) => userId.toString());
+    const keys = await redisClient.keys("SessionsByUserID:*");
+    const allSessionUserId=keys.map((key)=>key.split(":")[1])
     const allSessionUserIdSet = new Set(allSessionUserId);
 
     const transformedUser = allUsers.map(({ _id, name, email }) => ({
@@ -280,7 +337,14 @@ export const getAllUsers = async (req, res, next) => {
 export const logoutUserById = async (req, res, next) => {
   try {
     const userId = req.params?.userId;
-    await Session.deleteMany({ userId });
+    const sessionList = await redisClient.sMembers(
+      `SessionsByUserID:${userId}`,
+    );
+    sessionList.map((sessionId) =>
+      redisClient.del(`SessionsBySessionID:${sessionId}`),
+    );
+    await Promise.all(sessionList);
+    await redisClient.del(`SessionsByUserID:${userId}`);
     res.status(202).end();
   } catch (error) {
     console.log(error);
