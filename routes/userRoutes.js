@@ -31,7 +31,7 @@ router.get('/allusers',authCheck,checkRole,getAllUsers)
 
 router.post('/logout-user/:userId',authCheck,checkRole,logoutUserById)
 
-router.delete('/hard-delete-user/:userId',authCheck,hardDeleteUser)
+router.delete('/hard-delete-user/:userId',authCheck,checkAdminUser,hardDeleteUser)
 router.delete('/soft-delete-user/:userId',authCheck,checkAdminUser,softDeleteUser)
 
 export default router;

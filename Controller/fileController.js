@@ -2,7 +2,7 @@ import path from "path";
 import { ObjectId } from "mongodb";
 import Files from "../Model/fileModel.js";
 import Dir from "../Model/dirModel.js";
-import {  updateDirSize } from "./dirController.js";
+import { updateDirSize } from "./dirController.js";
 import mongoose from "mongoose";
 import {
   createPutSignUrl,
@@ -132,11 +132,14 @@ export const uploadFileComplete = async (req, res, next) => {
 
     if (objSize !== filesize) {
       await fileData.deleteOne();
-      res.json({ message: "File Size is match" });
+      if (!objSize) {
+        return res.json({ error: "File Uploading cancelled" });
+      }
+      return res.json({ error: "File Size is not match" });
     }
     await fileData.updateOne({ isUploading: false });
     updateDirSize(parentDirData.path, filesize);
-    res.json({ message: "File Uploaded Successfully" });
+    return res.json({ message: "File Uploaded Successfully" });
   } catch (error) {
     await fileData.deleteOne();
     console.log(error);
@@ -154,9 +157,9 @@ export const renameFile = async (req, res, next) => {
       return res.status(405).json({ error: "File not Found" });
     }
     if (!fileData.userId.equals(req.user._id)) {
-          return res
-      .status(403)
-      .json({ error: "You don't have permission to update file name" });
+      return res
+        .status(403)
+        .json({ error: "You don't have permission to update file name" });
     }
 
     if (!newFileName) {

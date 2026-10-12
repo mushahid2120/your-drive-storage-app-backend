@@ -79,8 +79,13 @@ export const verifyS3Object = async (fileFullName) => {
     const s3Response = await s3Client.send(headObjCommand);
     return s3Response.ContentLength;
   } catch (error) {
-    console.log(error);
-    return false;
+    if (error.name === "NotFound" || error["$metadata"]?.httpStatusCode === 404) {
+      console.log(`File not found in S3: ${fileFullName}`);
+      return false; 
+    }
+    
+    // Rethrow if it's a different error (e.g., Network issue, 403 Forbidden)
+    throw error;
   }
 };
 
